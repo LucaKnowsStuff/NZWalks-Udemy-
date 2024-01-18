@@ -1,4 +1,6 @@
-﻿using AutoMapper;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,35 +16,54 @@ namespace NZWalks.API.Controllers
     //api/regions
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class RegionsController : ControllerBase
     {
 
         private readonly IRegionRepository regionRepository;
         private readonly IMapper mapper;
-        public RegionsController(IRegionRepository regionRepository , IMapper mapper)
+        private readonly ILogger<RegionsController> logger;
+
+        public RegionsController(IRegionRepository regionRepository , 
+            IMapper mapper,
+            ILogger<RegionsController> logger)
         {
  
             this.regionRepository = regionRepository;
             this.mapper = mapper;
+            this.logger = logger;
         }
 
 
         //Endpoint to get all regions in the database
         [HttpGet]
+        //[Authorize(Roles = "Reader , Writer")]
         public async Task<IActionResult> GetAll()
         {
-            //Call the repository interface to get all regions
-            var regionsDomain = await regionRepository.GetAllAsync();
-            //Map them to a DTO
-            var regionsDTO =  mapper.Map<List<RegionDTO>>(regionsDomain);
-            //Return Ok 200 with the region list
-            return Ok(regionsDTO);
+            try
+            {
+                logger.LogInformation("Get All Regions Action Method Invocted");
+                //Call the repository interface to get all regions
+                var regionsDomain = await regionRepository.GetAllAsync();
+
+                logger.LogInformation($"Finished Request with data: {JsonSerializer.Serialize(regionsDomain)}");
+                //Map them to a DTO
+                var regionsDTO = mapper.Map<List<RegionDTO>>(regionsDomain);
+                //Return Ok 200 with the region list
+                return Ok(regionsDTO);
+
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw;
+            }
+ 
         }
 
         //Endpoint to get a region by its id
         [HttpGet]
         [Route("{id:Guid}")]
+        [Authorize(Roles = "Reader")]
         public async Task<IActionResult> GetbyId([FromRoute] Guid id)
         {   
             //Call the repository interface to get a region by its id
@@ -62,6 +83,7 @@ namespace NZWalks.API.Controllers
         //Endpoit to add a region to the database
         [HttpPost]
         [ValidateModel]
+        [Authorize(Roles = "Writer")]
         public async Task<IActionResult> Create([FromBody] AddRegionRequestDTO addRegionRequestDTO)
         {
             
@@ -82,6 +104,7 @@ namespace NZWalks.API.Controllers
         [HttpPut]
         [Route("{id:Guid}")]
         [ValidateModel]
+        [Authorize(Roles = "Writer")]
         public async Task<IActionResult> Update([FromRoute] Guid id , [FromBody] UpdateRegionRequestDTO updateRegionRequestDTO )
         {   
             //Map the DTO back to the RDM
@@ -109,6 +132,7 @@ namespace NZWalks.API.Controllers
         //Endpoint to delete a region in the DB
         [HttpDelete]
         [Route("{id:Guid}")]
+        [Authorize(Roles = "Writer")] 
         public async Task<IActionResult> Delete([FromRoute] Guid id)
         {
             //Call the repository interface to delete the region 
